@@ -10,11 +10,15 @@
 	div     { margin-bottom: 1em;  			font-family: sans-serif;}
         a       { color: lightblue 						}
         .top    { border-radius: 10px 10px 0 0;		padding: 5px;   	text-align: center; }
-        .second { text-align: center;    		padding: 5px; 		}
-        .left   { border-radius: 10px 0 0 0;    	padding: 5px; 		}
+        .second, .third { text-align: center;  		padding: 5px; 		}
 
-	#params tr:last-child td:first-child { 		border-radius: 0 0 0 10px;    		padding: 5px;		}
-	#params tr:last-child td:last-child  { 		border-bottom-right-radius: 5px;  	padding: 5px;		}
+	input[type=button] {width:100%}
+	input[value=clear] {margin-top:5px;}
+
+        #params tr td.left { 				border-radius: 10px 0 0 0;    		padding: 5px; 		}
+	#params tr:last-child td:first-child { 		border-radius: 0 0 0 10px;    		padding: 5px;		padding-top:0;}
+	#params tr:last-child td:last-child  { 		border-bottom-right-radius: 5px;  	padding: 5px;		padding-top:1px;}
+	#params tr td { padding-left: 5px; 		padding-top: 0px; 			height:1.5em;		}
 </style>
 <center><h3>Static <a href="https://en.wikipedia.org/wiki/Attribute_clash#Causes">attributed screen</a> simulation</h4></center>
 <div>Adjust the settings to your liking and drop or <input id=url placeholder=url><input id=fetch type=button value="fetch">
@@ -59,7 +63,8 @@ If you don't need it - just make sure to set the boundary values for each mode.<
 					<option value="1">1</option>
 				</select></td>`)
 			)}<td className="gray second"><input type=button value=interpolate/></td></tr>
-		<tr><td colspan=${keys.length + biasKeys.length}>Memory required: ${grayBytes} + ${charCols} * ${charRows} = ${grayBytes + attribBytes} bytes;</td><td className="gray">${'\u00A0'}</td></tr>
+		<tr><td colspan=${keys.length + biasKeys.length}>Memory required: ${grayBytes} + ${charCols} * ${charRows} = ${grayBytes + attribBytes} bytes;
+			</td><td className="gray third"><input type=button value=init/></td></tr>
 		<tr className="gray"><td className="left" colspan=${keys.length + biasKeys.length + 1}><b>Y values (from 0 to 100)</b></td></tr>
 		${range(Math.pow(2,lumaModes)).map((_,row)=>
 			html`<tr className="gray"><td>Mode ${row}</td><td colspan=${Math.max(rowSize, keys.length + biasKeys.length)}>${
@@ -160,9 +165,27 @@ If you don't need it - just make sure to set the boundary values for each mode.<
 						const diff = to - from;
 						const steps = end-start;
 						if (steps>1) for(var j = start+1;j<end;j++) state.Grays[j] = Math.round( (j - start) * diff / steps + from);
-					}								
+					}								                           
 				}else if (im.value == 'clear'){
 					state.Grays.fill('');
+				}else if (im.value == 'init'){
+					//YDepth YPalettes
+					const grayCnt = 2 << (state.settings.YDepth-1);
+					let grayIndex = 0;
+					for(let i = 0; i < grayCnt; i++) state.Grays[grayIndex++] = Math.floor(100 * i / (grayCnt - 1));
+					if (state.settings.YPalettes > 0){
+						for(let i = 0; i < grayCnt; i++) state.Grays[grayIndex++] = Math.floor(50 * i / (grayCnt - 1) + 25);
+					}
+					for(let i = 2; i <= state.settings.YPalettes; i++){
+						const len = 2 << (i - 2);
+						for(let j = 0; j < len; j++){
+						const min = Math.floor(100 * j / (len));
+						const max = Math.floor(100 * (j + 1) / (len));
+							for(let k = 0; k < grayCnt; k++){
+							 	state.Grays[grayIndex++] = Math.floor((max - min) * k / (grayCnt - 1) + min);
+							}
+						}
+					}
 				}
 				state.Valid = isValid(state);
 				render(paramCtrls(state), document.getElementById("settings"), document.getElementById("params"));
