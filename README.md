@@ -9,5 +9,5 @@ Drop the image on the page and see how it looks on the screen you've configured.
 To run it type
 ```
 npm install
-npm run
+npm start
 ```

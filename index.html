@@ -1,7 +1,8 @@
 <style>
 	tr:first-child + tr > td > input:not([type=button]){width:100px}
-	input:not([type=button]){width:50px}
-	select  {     width: 80px;    			height: 1.6em;		}
+	input:not([type=button]):not(#url){width:50px}
+	#url  	{ width: 200px; 						}
+	select  { width: 80px;    			height: 1.6em;		}
 	body    { background-color: black; 		color: white; 		}
         table   { border-collapse: collapse; 					}
 	.gray   { background: gray; 						}
@@ -12,7 +13,7 @@
         .top    { border-radius: 10px 10px 0 0;		padding: 5px;   	text-align: center; }
         .second, .third { text-align: center;  		padding: 5px; 		}
 
-	input[type=button] {width:100%}
+	input[type=button]:not(#fetch) {width:100%}
 	input[value=clear] {margin-top:5px;}
 
         #params tr td.left { 				border-radius: 10px 0 0 0;    		padding: 5px; 		}
