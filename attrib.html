@@ -1,0 +1,198 @@
+<style>
+	tr:first-child + tr > td > input:not([type=button]){width:100px}
+	input:not([type=button]):not(#url){width:50px}
+	#url  	{ width: 200px; 						}
+	select  { width: 80px;    			height: 1.6em;		}
+	body    { background-color: black; 		color: white; 		}
+        table   { border-collapse: collapse; 					}
+	.gray   { background: gray; 						}
+	#help   { line-height: 1.5rem; 						}
+	h4      { margin-bottom: 0; 						}
+	div     { margin-bottom: 1em;  			font-family: sans-serif;}
+        a       { color: lightblue 						}
+        .top    { border-radius: 10px 10px 0 0;		padding: 5px;   	text-align: center; }
+        .second, .third { text-align: center;  		padding: 5px; 		}
+
+	input[type=button]:not(#fetch) {width:100%}
+	input[value=clear] {margin-top:5px;}
+
+        #params tr td.left { 				border-radius: 10px 0 0 0;    		padding: 5px; 		}
+	#params tr:last-child td:first-child { 		border-radius: 0 0 0 10px;    		padding: 5px;		padding-top:0;}
+	#params tr:last-child td:last-child  { 		border-bottom-right-radius: 5px;  	padding: 5px;		padding-top:1px;}
+	#params tr td { padding-left: 5px; 		padding-top: 0px; 			height:1.5em;		}
+</style>
+<center><h3>Static <a href="https://en.wikipedia.org/wiki/Attribute_clash#Causes">attributed screen</a> simulation</h4></center>
+<div>Adjust the settings to your liking and drop or <input id=url placeholder=url><input id=fetch type=button value="fetch">
+ images to observe how they would look. Click the images to zoom them full-screen, click again to scale back.</div>
+<div><a href="https://en.wikipedia.org/wiki/YIQ"> Y and IQ </a> are encoded separately: Y is encoded per pixel (in <b>YDepth</b> bits), 
+I and Q is encoded per attribute (in <b>IDepth QDepth</b> bits) - it makes sense due to 
+<a href="https://retrocomputing.stackexchange.com/questions/12920/limitations-for-color-usage-in-ntsc/12921#12921">bandwidth constraints</a>.
+Bias is needed because we have to have 0 among the I/Q values to represent gray, so we need to chose what non-zero value is sacrificed for 0.
+</div>
+<div>Part of the attribute bit budget can be reserved for switching between Y value sets (<b>YModes</b>).
+Y values are in range 0..100, use <b>interpolate</b> button to fill in intermediate values if you have a lot of them.
+Interpolation spills over Y modes - this is intentional, think of splitting the whole Luma range over all the modes.
+If you don't need it - just make sure to set the boundary values for each mode.</div>
+</div>
+<div id="settings"></div>
+<script type="module">
+	// import { h, Component, render } from 'https://unpkg.com/preact?module';
+	// import htm from 'https://unpkg.com/htm?module';
+	import { h, Component, render } from './preact.module.js';
+	import htm from './htm.module.js';
+	function range(max){return Array(max).fill().map((v,i)=>i);}
+	var state = {settings:{Width:320, Height:200, AttrWidth:8, AttrHeight:8, YDepth:2, IDepth:4, QDepth:4, YPalettes:0, IBias: 1, QBias: 1 }, 
+		Grays:[25,50,75,100,  0,25,50,75], Valid:true};
+
+	function paramCtrls(props){
+		const params = props.settings;
+		const keys = Object.keys(params).filter(_ => _.indexOf('Bias') == -1);
+		const biasKeys = Object.keys(params).filter(_ => _.indexOf('Bias') != -1);
+		const grayBytes = Math.ceil(params.Width*params.Height*params.YDepth/8);
+		const charCols = params.Width / params.AttrWidth;
+		const charRows = params.Height / params.AttrHeight;
+		const attribBytes = (params.YDepth + params.IDepth + params.QDepth) * charCols * charRows/8;
+		const rowSize = Math.pow(2,params.YDepth);
+		const lumaModesVal = parseInt(params.YPalettes,10);
+		const lumaModes = isNaN(lumaModesVal)?0:lumaModesVal;
+		return html`<table id=params>
+		<tr>${keys.map(_ => html`<td>${_}</td>`).concat(biasKeys.map(_ => html`<td>${_}</td>`))}<td className="gray top"><input type=button value=clear/></td></tr>
+		<tr>${keys.map(_ => html`<td><input id=${_} value=${ params[_]}/></td>`).concat( 
+			biasKeys.map(_ => 
+				html`<td><select name=${_} id=${_} value=${ props.settings[_]}>
+					<option value="-1">-1</option>
+					<option value="1">1</option>
+				</select></td>`)
+			)}<td className="gray second"><input type=button value=interpolate/></td></tr>
+		<tr><td colspan=${keys.length + biasKeys.length}>Memory required: ${grayBytes} + ${charCols} * ${charRows} = ${grayBytes + attribBytes} bytes;
+			</td><td className="gray third"><input type=button value=init/></td></tr>
+		<tr className="gray"><td className="left" colspan=${keys.length + biasKeys.length + 1}><b>Y values (from 0 to 100)</b></td></tr>
+		${range(Math.pow(2,lumaModes)).map((_,row)=>
+			html`<tr className="gray"><td>Mode ${row}</td><td colspan=${Math.max(rowSize, keys.length + biasKeys.length)}>${
+				range(rowSize).map((_,col) =>
+					html`<input id=g${row*rowSize+col} value=${props.Grays[row*rowSize+col]}/>`
+				)}</td></tr>`
+		)}
+		
+		</table>`;
+	}
+	// Initialize htm with Preact
+	const html = htm.bind(h);
+	render(paramCtrls(state), document.getElementById("settings"), document.getElementById("params"));
+	function send(body){
+		fetch('https://ps3chd62zcrn2xfy6n5bscxr740yndyv.lambda-url.us-east-1.on.aws/', {
+			'method': 'POST',
+			headers : { 'Content-Type': 'application/json', Origin: window.location.href },
+			mode: "cors",
+			body : JSON.stringify(body)
+		}).then( _ => _.text().then( decoded => {
+			var img = document.createElement('img');
+			img.src = decoded.replaceAll('"','');
+			document.body.appendChild(img);
+			})
+		);
+	}
+	document.getElementById('fetch').onclick = function(){
+		if (state.Valid){
+			send({state: state, url: document.getElementById('url').value});
+		}else alert("Invalid settings");
+	}
+	window.addEventListener('dragover', function(ev){
+		ev.preventDefault();
+	}, false);
+	window.addEventListener('drop', function(ev){
+		ev.preventDefault();
+		if (state.Valid){
+			var data = ev.dataTransfer;
+			[].forEach.call(ev.dataTransfer.files, function(file){
+				var reader = new FileReader();
+				reader.onload = (e1) => {
+					send({state:state, file: reader.result}); 			
+				};
+				reader.readAsDataURL(file);
+			});
+		}else alert("Invalid settings");
+
+	},false);
+	function isValid(state){
+		return state.Grays.every(_ => !isNaN(parseInt(_,10))) && Object.keys(state.settings).every(_ => !isNaN(parseInt(state.settings[_],10)));
+	}
+	document.body.addEventListener('input', function(ev){
+		const id = ev.target.id;
+		if (id && id[0] == 'g'){
+			const index = parseInt(id.slice(1),10);
+			if (!isNaN(index)){
+				const val = parseInt(ev.target.value,10);
+				state.Grays[index] = isNaN(val) ? ev.target.value : val;
+			}
+		}else if (id && state.settings[id]!== undefined){
+			const val = parseInt(ev.target.value,10);
+			state.settings[id] = isNaN(val) ? ev.target.value : val; 
+			if (!isNaN(val) &&  (id == 'YDepth' || id == 'YPalettes')){
+					const size = Math.min(64, Math.pow(2,state.settings.YDepth) * Math.pow(2, state.settings.YPalettes));
+					//if (size < state.Grays.length) state.Grays = state.Grays.slice(0, size);
+					//else state.Grays = state.Grays.concat(Array(size - state.Grays.length).fill(''));
+					state.Grays = Array(size).fill('');
+			}
+		}
+		state.Valid = isValid(state);
+		render(paramCtrls(state), document.getElementById("settings"), document.getElementById("params"));
+	});
+	document.body.addEventListener('click', function(ev){
+		var im = ev.target;
+		if (im.nodeName == "IMG"){
+			if (im.style.position == "fixed"){
+				im.style.position = "";
+				im.style.width = "";
+				im.style.height = "";
+				im.style.top = "";
+			}else{
+				im.style.position = "fixed";
+				im.style.width = "100vw";
+				im.style.height = "100vh";
+				im.style.top = "0px";
+				im.style.left = "0px";
+			}
+		}else{
+			 if (im.nodeName == 'INPUT' && im.getAttribute('type') == 'button'){
+				if(im.value == 'interpolate'){
+					var indexes = [];
+					for(var i=0;i<state.Grays.length;i++) if (!isNaN(parseInt(state.Grays[i],10))) indexes.push(i);
+
+					if (indexes.length>1) for(var i = 1; i<indexes.length;i++){
+						const start = indexes[i-1];
+						const end = indexes[i];
+						const from = state.Grays[start];
+						const to = state.Grays[end];
+						const diff = to - from;
+						const steps = end-start;
+						if (steps>1) for(var j = start+1;j<end;j++) state.Grays[j] = Math.round( (j - start) * diff / steps + from);
+					}								                           
+				}else if (im.value == 'clear'){
+					state.Grays.fill('');
+				}else if (im.value == 'init'){
+					//YDepth YPalettes
+					const grayCnt = 2 << (state.settings.YDepth-1);
+					let grayIndex = 0;
+					for(let i = 0; i < grayCnt; i++) state.Grays[grayIndex++] = Math.floor(100 * i / (grayCnt - 1));
+					if (state.settings.YPalettes > 0){
+						for(let i = 0; i < grayCnt; i++) state.Grays[grayIndex++] = Math.floor(50 * i / (grayCnt - 1) + 25);
+					}
+					for(let i = 2; i <= state.settings.YPalettes; i++){
+						const len = 2 << (i - 2);
+						for(let j = 0; j < len; j++){
+						const min = Math.floor(100 * j / (len));
+						const max = Math.floor(100 * (j + 1) / (len));
+							for(let k = 0; k < grayCnt; k++){
+							 	state.Grays[grayIndex++] = Math.floor((max - min) * k / (grayCnt - 1) + min);
+							}
+						}
+					}
+				}
+				state.Valid = isValid(state);
+				render(paramCtrls(state), document.getElementById("settings"), document.getElementById("params"));
+			}
+		}
+	});
+
+</script>
