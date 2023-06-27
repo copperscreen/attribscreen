@@ -53,7 +53,6 @@ function levels(max, from, to, bias){
 	return array;
 }
 
-//export 
 async function process(reqBody){
 try{
 	const state = reqBody.state;
@@ -64,14 +63,9 @@ try{
 	const IMax = Math.pow(2,params.IDepth) - 1;
 	const ILevels = levels(Math.pow(2,params.IDepth), -0.595, 0.595, params.IBias);
 	const QLevels = levels(Math.pow(2,params.QDepth), -0.522, 0.522, params.QBias);
-//	var file1 = new Buffer('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFhAJ/wlseKgAAAABJRU5ErkJggg==', 'base64');
-//	var file1 = new Buffer(reqBody.file.split(',',2).pop(), 'base64');
-//return {mime:'r/r', encoded: reqBody.file.split(',',2).pop()};
-
 	var file = reqBody.url || new Buffer(reqBody.file.split(',',2).pop(), 'base64');
 
 	const image = await Jimp.read(file);
-//return {mime:'r/r', encoded: reqBody.file.split(',',2).pop()};
 	image.resize(params.Width, params.Height, Jimp.RESIZE_BILINEAR);
 	image.normalize();
 		
@@ -135,7 +129,7 @@ try{
 	const encoded = await image.getBase64Async(mime);
 	return {mime, encoded};
 }catch (ex){
-return {mime:'e/e', encoded: ex.stack};
+	return {mime:'err/err', encoded: ex.stack};
 }
 }
 module.exports = process;
